@@ -12,8 +12,8 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="LaTeX Math" />
   <Description DefaultValue="Fast offline LaTeX math equations in Microsoft Excel" />
-  <IconUrl DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/icon-64.png" />
+  <IconUrl DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/icon-64.png" />
   <SupportUrl DefaultValue="https://venketeshswamy.github.io/ExcelLatex/help.html" />
   <AppDomains>
     <AppDomain>https://venketeshswamy.github.io</AppDomain>
@@ -31,7 +31,7 @@
   </Requirements>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/taskpane.html" />
+    <SourceLocation DefaultValue="https://venketeshswamy.github.io/ExcelLatex/taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -110,16 +110,16 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="ExcelKaTeX.Icon.16" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/icon-16.png"/>
-        <bt:Image id="ExcelKaTeX.Icon.32" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/icon-32.png"/>
-        <bt:Image id="ExcelKaTeX.Icon.80" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/icon-80.png"/>
+        <bt:Image id="ExcelKaTeX.Icon.16" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/icon-16.png"/>
+        <bt:Image id="ExcelKaTeX.Icon.32" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/icon-32.png"/>
+        <bt:Image id="ExcelKaTeX.Icon.80" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="ExcelKaTeX.Taskpane.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/taskpane.html"/>
-        <bt:Url id="ExcelKaTeX.SharedRuntime.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/taskpane.html"/>
-        <bt:Url id="ExcelKaTeX.Functions.Script.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/assets/functions.js"/>
-        <bt:Url id="ExcelKaTeX.FuncMeta.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/functions.json"/>
-        <bt:Url id="ExcelKaTeX.GetStarted.Learn" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/dist/taskpane.html"/>
+        <bt:Url id="ExcelKaTeX.Taskpane.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/taskpane.html"/>
+        <bt:Url id="ExcelKaTeX.SharedRuntime.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/taskpane.html"/>
+        <bt:Url id="ExcelKaTeX.Functions.Script.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/assets/functions.js"/>
+        <bt:Url id="ExcelKaTeX.FuncMeta.Url" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/functions.json"/>
+        <bt:Url id="ExcelKaTeX.GetStarted.Learn" DefaultValue="https://venketeshswamy.github.io/ExcelLatex/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="ExcelKaTeX.Functions.Namespace" DefaultValue="MATH"/>
