@@ -1,0 +1,62 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/office/schemas/custom-functions.json",
+  "functions": [
+    {
+      "id": "KATEX",
+      "name": "KATEX",
+      "description": "Renders a LaTeX mathematical equation locally via KaTeX into an in-cell image or floating shape.",
+      "helpUrl": "https://localhost:3000/help.html",
+      "options": {
+        "requiresAddress": true,
+        "requiresInvocation": true
+      },
+      "result": {
+        "type": "any",
+        "dimensionality": "scalar"
+      },
+      "parameters": [
+        {
+          "name": "latexString",
+          "description": "The LaTeX mathematical formula string to render (e.g. '\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}').",
+          "type": "string",
+          "dimensionality": "scalar"
+        },
+        {
+          "name": "background",
+          "description": "Background color code or CSS string: 0 or 'transparent' (default), 1 or 'white' (#ffffff), 2 or 'black' (#000000), or custom hex/CSS color.",
+          "type": "any",
+          "dimensionality": "scalar",
+          "optional": true
+        },
+        {
+          "name": "color",
+          "description": "Foreground equation color (e.g. '#000000', '#ffffff', 'red'). Defaults to black on light/transparent bg, and white on black bg.",
+          "type": "any",
+          "dimensionality": "scalar",
+          "optional": true
+        },
+        {
+          "name": "fontSize",
+          "description": "Font size in pt (e.g. 14, 16, 20). Default: 16.",
+          "type": "number",
+          "dimensionality": "scalar",
+          "optional": true
+        },
+        {
+          "name": "displayMode",
+          "description": "Whether to render in display math mode (true) or inline mode (false). Default: true.",
+          "type": "boolean",
+          "dimensionality": "scalar",
+          "optional": true
+        },
+        {
+          "name": "outputMethod",
+          "description": "Output method: 'auto' (in-cell image if supported, shape fallback), 'cell' (force in-cell image), or 'shape' (force floating shape). Default: 'auto'.",
+          "type": "string",
+          "dimensionality": "scalar",
+          "optional": true
+        }
+      ]
+    }
+  ]
+}
