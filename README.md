@@ -11,9 +11,12 @@ A fast, 100% offline LaTeX mathematical equation editor and custom function engi
 - **Equation Catalog**: Pre-built library of common calculus, linear algebra, statistics, and physics equations.
 
 ## Getting Started
+1. You can simply download the Excel file in this repository and open it and things will be done
 
-### Prerequisites
+## Disclaimer
+This is AI generated and tested - So needs your real world feedbacks to make it better and enhance the features and accessibility
 
+### Prerequisites - Only for raw code
 - Node.js (v18 or higher)
 - Microsoft Excel (Desktop or Web)
 
