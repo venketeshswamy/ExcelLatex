@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>d71c1b7e-8c38-4e12-b13c-74a621e25e1a</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>ExcelKaTeX Team</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="LaTeX Math" />
+  <Description DefaultValue="Fast offline LaTeX math equations in Microsoft Excel" />
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-64.png" />
+  <SupportUrl DefaultValue="https://localhost:3000/help.html" />
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="CustomFunctionsRuntime" MinVersion="1.1"/>
+      <Set Name="SharedRuntime" MinVersion="1.1"/>
+    </Sets>
+  </Requirements>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Requirements>
+      <bt:Sets DefaultMinVersion="1.3">
+        <bt:Set Name="CustomFunctionsRuntime" MinVersion="1.1"/>
+        <bt:Set Name="SharedRuntime" MinVersion="1.1"/>
+      </bt:Sets>
+    </Requirements>
+
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <Runtimes>
+          <Runtime resid="ExcelKaTeX.SharedRuntime.Url" lifetime="long" />
+        </Runtimes>
+
+        <AllFormFactors>
+          <ExtensionPoint xsi:type="CustomFunctions">
+            <Script>
+              <SourceLocation resid="ExcelKaTeX.Functions.Script.Url"/>
+            </Script>
+            <Page>
+              <SourceLocation resid="ExcelKaTeX.SharedRuntime.Url"/>
+            </Page>
+            <Metadata>
+              <SourceLocation resid="ExcelKaTeX.FuncMeta.Url"/>
+            </Metadata>
+            <Namespace resid="ExcelKaTeX.Functions.Namespace"/>
+          </ExtensionPoint>
+        </AllFormFactors>
+
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="ExcelKaTeX.GetStarted.Title"/>
+            <Description resid="ExcelKaTeX.GetStarted.Desc"/>
+            <LearnMoreUrl resid="ExcelKaTeX.GetStarted.Learn"/>
+          </GetStarted>
+          
+          <FunctionFile resid="ExcelKaTeX.SharedRuntime.Url"/>
+
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <CustomTab id="ExcelKaTeX.Tab">
+              <Group id="ExcelKaTeX.Group">
+                <Label resid="ExcelKaTeX.GroupLabel"/>
+                <Icon>
+                  <bt:Image size="16" resid="ExcelKaTeX.Icon.16"/>
+                  <bt:Image size="32" resid="ExcelKaTeX.Icon.32"/>
+                  <bt:Image size="80" resid="ExcelKaTeX.Icon.80"/>
+                </Icon>
+
+                <Control xsi:type="Button" id="ExcelKaTeX.TaskpaneButton">
+                  <Label resid="ExcelKaTeX.TaskpaneButton.Label"/>
+                  <Supertip>
+                    <Title resid="ExcelKaTeX.TaskpaneButton.Label"/>
+                    <Description resid="ExcelKaTeX.TaskButton.Tip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="ExcelKaTeX.Icon.16"/>
+                    <bt:Image size="32" resid="ExcelKaTeX.Icon.32"/>
+                    <bt:Image size="80" resid="ExcelKaTeX.Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Office.AutoShowTaskpaneWithDocument</TaskpaneId>
+                    <SourceLocation resid="ExcelKaTeX.Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+              <Label resid="ExcelKaTeX.TabLabel"/>
+            </CustomTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+
+    <Resources>
+      <bt:Images>
+        <bt:Image id="ExcelKaTeX.Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+        <bt:Image id="ExcelKaTeX.Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+        <bt:Image id="ExcelKaTeX.Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="ExcelKaTeX.Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="ExcelKaTeX.SharedRuntime.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="ExcelKaTeX.Functions.Script.Url" DefaultValue="https://localhost:3000/assets/functions.js"/>
+        <bt:Url id="ExcelKaTeX.FuncMeta.Url" DefaultValue="https://localhost:3000/functions.json"/>
+        <bt:Url id="ExcelKaTeX.GetStarted.Learn" DefaultValue="https://localhost:3000/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="ExcelKaTeX.Functions.Namespace" DefaultValue="MATH"/>
+        <bt:String id="ExcelKaTeX.TabLabel" DefaultValue="LaTeX Math"/>
+        <bt:String id="ExcelKaTeX.GroupLabel" DefaultValue="LaTeX Math"/>
+        <bt:String id="ExcelKaTeX.TaskpaneButton.Label" DefaultValue="LaTeX Math"/>
+        <bt:String id="ExcelKaTeX.GetStarted.Title" DefaultValue="LaTeX Math"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="ExcelKaTeX.TaskButton.Tip" DefaultValue="Open LaTeX Math equation editor."/>
+        <bt:String id="ExcelKaTeX.GetStarted.Desc" DefaultValue="Fast LaTeX math equation editor with in-cell rendering."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

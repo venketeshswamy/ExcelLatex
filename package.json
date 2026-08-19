@@ -1,0 +1,38 @@
+{
+  "name": "excel-katex",
+  "version": "1.0.0",
+  "description": "100% Local & Fast Offline KaTeX Math Equation Add-in for Microsoft Excel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/copy-assets.js && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "copy-assets": "node scripts/copy-assets.js"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.54.0",
+    "@fluentui/react-icons": "^2.0.260",
+    "katex": "^0.16.11",
+    "mathlive": "^0.100.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.0.0",
+    "@types/custom-functions-runtime": "^1.6.0",
+    "@types/katex": "^0.16.7",
+    "@types/node": "^20.14.12",
+    "@types/office-js": "^1.0.385",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^24.1.1",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.4",
+    "vite-plugin-static-copy": "^1.0.6",
+    "vitest": "^2.0.4"
+  }
+}
