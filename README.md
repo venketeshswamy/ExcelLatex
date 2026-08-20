@@ -11,7 +11,14 @@ A fast, 100% offline LaTeX mathematical equation editor and custom function engi
 - **Equation Catalog**: Pre-built library of common calculus, linear algebra, statistics, and physics equations.
 
 ## Getting Started
-1. You can simply download the Excel Manifest File and upload it into your addons
+1. Download the **installaddin.bat** file and run it
+2. Open Excel and Click on Addin
+3. Under Developer Addin you will find the addin
+
+
+## Deleting the add-in
+1. Use the **uninstalladdin.bat** file and run it
+2. Restart Excel
 ## Disclaimer
-This is AI generated and tested - So needs your real world feedbacks to make it better and enhance the features and accessibility
+This is AI generated and tested - So needs your real world feedbacks to make it better and enhance the features and accessibility. Open source documents are given- Feel free to take them and edit them.
 
