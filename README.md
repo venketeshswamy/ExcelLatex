@@ -11,50 +11,7 @@ A fast, 100% offline LaTeX mathematical equation editor and custom function engi
 - **Equation Catalog**: Pre-built library of common calculus, linear algebra, statistics, and physics equations.
 
 ## Getting Started
-1. You can simply download the Excel file in this repository and open it and things will be done
-
+1. You can simply download the Excel Manifest File and upload it into your addons
 ## Disclaimer
 This is AI generated and tested - So needs your real world feedbacks to make it better and enhance the features and accessibility
 
-### Prerequisites - Only for raw code
-- Node.js (v18 or higher)
-- Microsoft Excel (Desktop or Web)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/venketeshswamy/ExcelLatex.git
-cd ExcelLatex
-
-# Install dependencies
-npm install
-```
-
-### Development
-
-```bash
-# Start the local development server
-npm run dev
-
-# Sideload the add-in into Excel
-npx office-addin-dev-settings sideload public/manifest.xml -a excel
-```
-
-### Testing & Verification
-
-```bash
-# Run unit, integration, and adversarial test suites
-npm test
-```
-
-### Production Build
-
-```bash
-# Build the production bundle into dist/
-npm run build
-```
-
-## License
-
-MIT License
