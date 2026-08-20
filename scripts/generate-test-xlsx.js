@@ -99,6 +99,8 @@ const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/xl/webextensions/webextension1.xml" ContentType="application/vnd.ms-office.webextension+xml"/>
+  <Override PartName="/xl/webextensions/taskpanes.xml" ContentType="application/vnd.ms-office.webextensiontaskpanes+xml"/>
 </Types>`;
 
 const packageRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -117,6 +119,7 @@ const workbookRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.microsoft.com/office/2011/relationships/webextensiontaskpanes" Target="webextensions/taskpanes.xml"/>
 </Relationships>`;
 
 const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -140,6 +143,27 @@ const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
   </cellXfs>
 </styleSheet>`;
+
+const webextension1Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<we:webextension xmlns:we="http://schemas.microsoft.com/office/webextensions/webextension/2015/01" id="d71c1b7e-8c38-4e12-b13c-74a621e25e1a">
+  <we:reference id="d71c1b7e-8c38-4e12-b13c-74a621e25e1a" version="1.0.0.0" store="developer" storeType="developer"/>
+  <we:alternateReferences/>
+  <we:properties/>
+  <we:bindings/>
+  <we:snapshot xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>
+</we:webextension>`;
+
+const taskpanesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11">
+  <wetp:taskpane dockstate="right" visibility="1" width="350" row="1">
+    <wetp:webextensionref xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId1"/>
+  </wetp:taskpane>
+</wetp:taskpanes>`;
+
+const taskpanesRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.microsoft.com/office/2011/relationships/webextension" Target="webextension1.xml"/>
+</Relationships>`;
 
 const rows = [
   { a: 'LaTeX Expression', b: 'Equation Name', c: 'In-Cell Formula (=MATH.KATEX)', d: 'Background Code' },
@@ -186,15 +210,19 @@ const files = [
   { name: 'xl/workbook.xml', content: workbookXml },
   { name: 'xl/_rels/workbook.xml.rels', content: workbookRels },
   { name: 'xl/styles.xml', content: stylesXml },
-  { name: 'xl/worksheets/sheet1.xml', content: sheet1Xml }
+  { name: 'xl/worksheets/sheet1.xml', content: sheet1Xml },
+  { name: 'xl/webextensions/webextension1.xml', content: webextension1Xml },
+  { name: 'xl/webextensions/taskpanes.xml', content: taskpanesXml },
+  { name: 'xl/webextensions/_rels/taskpanes.xml.rels', content: taskpanesRels }
 ];
 
 const buf = createZip(files);
-const tempPath = path.join(os.tmpdir(), 'Excel_Latex_Math_Test.xlsx');
-const dlPath = path.join(os.homedir(), 'Downloads', 'Excel_Latex_Math_Test.xlsx');
+const localPath = path.resolve('ExcelKatexFile.xlsx');
+const dlPath = path.join(os.homedir(), 'Downloads', 'ExcelKatexFile.xlsx');
 
-fs.writeFileSync(tempPath, buf);
-fs.writeFileSync(dlPath, buf);
+fs.writeFileSync(localPath, buf);
+try {
+  fs.writeFileSync(dlPath, buf);
+} catch { /* ignore */ }
 
-console.log(`[Temp File Created]: ${tempPath}`);
-console.log(`[Downloads File Created]: ${dlPath}`);
+console.log(`[ExcelKatexFile Created]: ${localPath}`);

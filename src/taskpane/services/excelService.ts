@@ -87,26 +87,66 @@ export async function insertInCellImageToActiveCell(
     return;
   }
 
-  const supportsEntity = isEntityCellValueSupported();
+  const renderResult = await compileLatex(latex, options);
+  const rawBase64 = toRawBase64(renderResult.pngDataUrl);
 
-  if (supportsEntity) {
-    try {
-      const renderResult = await compileLatex(latex, options);
-      const webImage = buildKatexWebImageCellValue(latex, renderResult, options);
-
-      await Excel.run(async (context) => {
-        const range = context.workbook.getSelectedRange();
-        (range as any).valuesAsJson = [[webImage]];
-        await context.sync();
-      });
-      return;
-    } catch (err) {
-      console.warn('[ExcelKaTeX] In-cell image failed, falling back to shape:', err);
-    }
+  if (!rawBase64 || rawBase64.length < 10) {
+    throw new Error('Image generation failed — empty rasterizer output.');
   }
 
-  // Fallback to floating shape on legacy hosts
-  await insertFloatingShapeToActiveCell(latex, options);
+  const metadataJson = serializeEquationMetadata(latex, options);
+
+  await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = context.workbook.getSelectedRange();
+    range.load(['left', 'top', 'width', 'height', 'address']);
+    const shapes = sheet.shapes;
+    shapes.load(['items/name', 'items/left', 'items/top', 'items/altTextTitle']);
+    await context.sync();
+
+    const targetLeft = range.left;
+    const targetTop = range.top;
+    const shapeTag = `LaTeX_Shape_${range.address || 'cell'}`;
+
+    // Remove any existing shape anchored at this cell
+    for (const s of shapes.items) {
+      if (
+        s.name === shapeTag ||
+        (Math.abs(s.left - targetLeft) < 5 && Math.abs(s.top - targetTop) < 5 && s.altTextTitle?.startsWith('LaTeX:'))
+      ) {
+        try {
+          s.delete();
+        } catch { /* ignore */ }
+      }
+    }
+    await context.sync();
+
+    // 1. Pass local Base64 binary bytes directly through Excel's native decoder
+    const shape = sheet.shapes.addImage(rawBase64);
+    shape.name = shapeTag;
+    shape.left = targetLeft;
+    shape.top = targetTop;
+    shape.width = renderResult.width;
+    shape.height = renderResult.height;
+    shape.altTextTitle = `LaTeX: ${latex}`;
+    shape.altTextDescription = metadataJson;
+
+    // 2. Try native M365 placeInCell if supported
+    try {
+      if (typeof (shape as any).placeInCell === 'function') {
+        (shape as any).placeInCell(range);
+      } else {
+        // Anchor firmly to cell bounds so it moves & sizes with the cell
+        (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
+      }
+    } catch {
+      try {
+        (shape as any).placement = 'TwoCellAnchor';
+      } catch { /* continue */ }
+    }
+
+    await context.sync();
+  });
 }
 
 // ─── Action 2: Insert Formula (=MATH.KATEX) ──────────────────────────────────
@@ -354,8 +394,25 @@ export async function batchConvertSelectedRange(
               destCell.formulas = [[`=MATH.KATEX("${escapeFormulaString(latex)}", ${bg})`]];
             } else {
               const renderResult = await compileLatex(latex, options);
-              const webImage = buildKatexWebImageCellValue(latex, renderResult, options);
-              (destCell as any).valuesAsJson = [[webImage]];
+              const rawBase64 = toRawBase64(renderResult.pngDataUrl);
+              destCell.load(['left', 'top', 'address']);
+              await context.sync();
+
+              const shape = sheet.shapes.addImage(rawBase64);
+              shape.left = destCell.left;
+              shape.top = destCell.top;
+              shape.width = renderResult.width;
+              shape.height = renderResult.height;
+              shape.altTextTitle = `LaTeX: ${latex}`;
+              shape.altTextDescription = serializeEquationMetadata(latex, options);
+
+              try {
+                if (typeof (shape as any).placeInCell === 'function') {
+                  (shape as any).placeInCell(destCell);
+                } else {
+                  (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
+                }
+              } catch { /* continue */ }
             }
             converted++;
           } catch { /* continue */ }
