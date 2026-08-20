@@ -82,8 +82,8 @@ async function renderKatexToCanvas(
     'position:absolute', 'top:0px', 'left:-99999px',
     'visibility:visible', 'opacity:1', 'pointer-events:none', 'z-index:-9999',
     `font-size:${fontSizePx}px`, `color:${color}`, `background:${bg}`,
-    'white-space:nowrap', 'display:inline-flex', 'align-items:center',
-    'padding:8px 12px', 'box-sizing:border-box',
+    'white-space:nowrap', 'display:inline-block',
+    'padding:4px 6px', 'box-sizing:border-box',
   ].join(';');
   probe.innerHTML = katexHtml;
   document.body.appendChild(probe);
