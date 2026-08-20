@@ -137,13 +137,26 @@ async function renderKatexToCanvas(
   // ── Step 5: Draw math lines (CSS border-bottom / border-top, no text node) ─
   const mathLines = probe.querySelectorAll('.frac-line, .overline-line, .underline-line, .hline');
   for (const el of mathLines) {
-    const rect = el.getBoundingClientRect();
     const isOverline = el.classList.contains('overline-line');
     const style = window.getComputedStyle(el);
     const lineW = parseFloat(style.borderBottomWidth) || parseFloat(style.borderTopWidth) || 0.6;
+    
+    let rect = el.getBoundingClientRect();
     let x = rect.left - ox;
     let y = isOverline ? (rect.top - oy) : (rect.top - oy + rect.height);
     let w = rect.width;
+
+    // Strictly clamp fraction lines to the width and position of their parent .mfrac
+    if (el.classList.contains('frac-line')) {
+      const mfrac = el.closest('.mfrac');
+      if (mfrac) {
+        const mfracRect = mfrac.getBoundingClientRect();
+        if (mfracRect.width > 0) {
+          x = mfracRect.left - ox;
+          w = mfracRect.width;
+        }
+      }
+    }
 
     if (w <= 0) {
       w = 30;
@@ -171,7 +184,6 @@ async function renderKatexToCanvas(
       if (parent) {
         const style = window.getComputedStyle(parent);
         if (style.display !== 'none' && style.visibility !== 'hidden') {
-          // getBoundingClientRect on a Range gives per-line text rects
           try {
             const fontStr = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
             ctx.save();
@@ -184,13 +196,9 @@ async function renderKatexToCanvas(
               const range = document.createRange();
               range.selectNodeContents(tnode);
               const rects = range.getClientRects();
-              if (rects && rects.length > 0) {
-                for (const r of rects) {
-                  if (r.width > 0 && r.height > 0) {
-                    ctx.fillText(text, r.left - ox, r.top - oy);
-                    drew = true;
-                  }
-                }
+              if (rects && rects.length > 0 && rects[0].width > 0 && rects[0].height > 0) {
+                ctx.fillText(text, rects[0].left - ox, rects[0].top - oy);
+                drew = true;
               }
             }
 
