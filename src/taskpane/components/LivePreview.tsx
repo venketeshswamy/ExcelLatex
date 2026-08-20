@@ -3,9 +3,7 @@ import {
   makeStyles,
   tokens,
   shorthands,
-  Card,
   Caption1,
-  Badge,
   Slider,
   Button,
   Dropdown,
@@ -20,9 +18,7 @@ import {
   CheckmarkCircle16Filled
 } from '@fluentui/react-icons';
 import {
-  compileLatexToHtml,
-  calculateComplexity,
-  LatexComplexity
+  compileLatexToHtml
 } from '../../core/katexEngine';
 
 const useStyles = makeStyles({
@@ -89,6 +85,8 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    maxWidth: '100%',
+    overflowX: 'auto',
     transitionProperty: 'transform',
     transitionDuration: '0.15s',
     transitionTimingFunction: 'ease-out'
@@ -136,8 +134,6 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
   latex,
   isValid,
   errorMessage,
-  displayMode = true,
-  onDisplayModeChange,
   background = 0,
   onBackgroundChange,
   textColor = '#000000'
@@ -157,27 +153,8 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
   const compiledHtml = useMemo(() => {
     if (!latex || !latex.trim()) return '';
-    return compileLatexToHtml(latex, { displayMode, throwOnError: false });
-  }, [latex, displayMode]);
-
-  const complexity: LatexComplexity = useMemo(() => {
-    return calculateComplexity(latex);
+    return compileLatexToHtml(latex, { displayMode: true, throwOnError: false });
   }, [latex]);
-
-  const getComplexityColor = (score: string) => {
-    switch (score) {
-      case 'Simple':
-        return 'success';
-      case 'Moderate':
-        return 'informative';
-      case 'Complex':
-        return 'warning';
-      case 'Advanced':
-        return 'danger';
-      default:
-        return 'informative';
-    }
-  };
 
   const handleZoomChange = (_ev: any, data: { value: number }) => {
     setZoom(data.value);
@@ -214,24 +191,6 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
         </div>
 
         <div className={styles.dropdownsGroup}>
-          {onDisplayModeChange && (
-            <Dropdown
-              aria-label="Display Mode"
-              value={displayMode ? 'Display Mode (Block)' : 'Inline Mode'}
-              selectedOptions={[displayMode ? 'true' : 'false']}
-              onOptionSelect={(_e, data) => {
-                if (data.optionValue !== undefined && onDisplayModeChange) {
-                  onDisplayModeChange(data.optionValue === 'true');
-                }
-              }}
-              size="small"
-              className={styles.dropdown}
-            >
-              <Option value="true" text="Display Mode (Block)">Display Mode (Block)</Option>
-              <Option value="false" text="Inline Mode">Inline Mode</Option>
-            </Dropdown>
-          )}
-
           {onBackgroundChange && (
             <Dropdown
               aria-label="Background"
@@ -255,92 +214,87 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
       <div className={styles.controlsRow}>
         <div className={styles.zoomControls}>
-          <Tooltip content="Zoom Out" relationship="description">
+          <Tooltip content="Zoom Out" relationship="label">
             <Button
-              size="small"
               appearance="subtle"
               icon={<ZoomOut20Regular />}
-              onClick={() => setZoom((z) => Math.max(50, z - 25))}
-              disabled={zoom <= 50}
-              aria-label="Zoom out preview"
+              size="small"
+              onClick={() => setZoom((z) => Math.max(50, z - 10))}
+              aria-label="Zoom Out"
             />
           </Tooltip>
 
           <Slider
             min={50}
             max={200}
-            step={10}
+            step={5}
             value={zoom}
             onChange={handleZoomChange}
-            style={{ width: '100px' }}
-            aria-label="Zoom percentage"
+            style={{ width: '120px' }}
+            aria-label="Zoom slider"
           />
 
-          <Tooltip content="Zoom In" relationship="description">
+          <Tooltip content="Zoom In" relationship="label">
             <Button
-              size="small"
               appearance="subtle"
               icon={<ZoomIn20Regular />}
-              onClick={() => setZoom((z) => Math.min(200, z + 25))}
-              disabled={zoom >= 200}
-              aria-label="Zoom in preview"
+              size="small"
+              onClick={() => setZoom((z) => Math.min(200, z + 10))}
+              aria-label="Zoom In"
             />
           </Tooltip>
 
-          <Tooltip content="Reset Zoom (100%)" relationship="description">
+          <Tooltip content="Reset Zoom" relationship="label">
             <Button
-              size="small"
               appearance="subtle"
               icon={<ArrowReset20Regular />}
+              size="small"
               onClick={handleResetZoom}
-              aria-label="Reset zoom"
-            >
-              {zoom}%
-            </Button>
+              aria-label="Reset Zoom"
+            />
           </Tooltip>
+
+          <span>{zoom}%</span>
         </div>
       </div>
 
-      {!isValid && errorMessage ? (
+      {!isValid && errorMessage && (
         <div className={styles.errorBanner} role="alert">
           <Warning20Regular />
-          <div>{errorMessage}</div>
+          <span>{errorMessage}</span>
         </div>
-      ) : (
-        <Card className={styles.previewCard} style={previewCardStyle} role="region" aria-label="Equation Preview">
-          {latex.trim() ? (
-            <div
-              className={styles.renderedWrapper}
-              style={{
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'center center',
-                color: effectiveTextColor
-              }}
-              dangerouslySetInnerHTML={{ __html: compiledHtml }}
-            />
-          ) : (
-            <div style={{ color: tokens.colorNeutralForeground4, fontStyle: 'italic' }}>
-              Equation preview will appear here...
-            </div>
-          )}
-        </Card>
       )}
 
-      {latex.trim() && (
-        <div className={styles.metricsBar}>
-          <span>
-            {isValid ? (
-              <span style={{ color: tokens.colorPaletteGreenForeground1 }}>
-                <CheckmarkCircle16Filled style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Syntax Clean
-              </span>
-            ) : (
-              'Syntax Error'
-            )}
+      <div className={styles.previewCard} style={previewCardStyle} role="region" aria-label="Equation Preview">
+        {compiledHtml ? (
+          <div
+            className={styles.renderedWrapper}
+            style={{
+              transform: `scale(${zoom / 100})`,
+              transformOrigin: 'center center'
+            }}
+            dangerouslySetInnerHTML={{ __html: compiledHtml }}
+          />
+        ) : (
+          <span style={{ color: tokens.colorNeutralForeground4, fontStyle: 'italic' }}>
+            No equation to preview
           </span>
-          <span>Scale: {zoom}%</span>
-        </div>
-      )}
+        )}
+      </div>
+
+      <div className={styles.metricsBar}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {isValid ? (
+            <>
+              <CheckmarkCircle16Filled style={{ color: tokens.colorPaletteGreenForeground1 }} />
+              <span>Syntax Clean</span>
+            </>
+          ) : (
+            <span style={{ color: tokens.colorPaletteRedForeground1 }}>Syntax Error</span>
+          )}
+        </span>
+        <span>Scale: {zoom}%</span>
+      </div>
     </div>
   );
 };

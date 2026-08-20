@@ -128,8 +128,23 @@ export const App: React.FC = () => {
     setSelectedTab('editor');
   };
 
-  const handleReadCellSuccess = (extractedLatex: string) => {
-    setEquation(extractedLatex, 'cell');
+  const handleReadCellSuccess = (extracted: any) => {
+    if (typeof extracted === 'string') {
+      setEquation(extracted, 'cell');
+    } else if (extracted && typeof extracted === 'object') {
+      if (extracted.latex) {
+        setEquation(extracted.latex, 'cell');
+      }
+      if (extracted.background !== undefined) {
+        handleBgColorChange(extracted.background);
+      }
+      if (extracted.color) {
+        setTextColor(extracted.color);
+      }
+      if (extracted.fontSize) {
+        setFontSize(extracted.fontSize);
+      }
+    }
   };
 
   const cacheStats = getEquationCacheStats();

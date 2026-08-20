@@ -340,7 +340,7 @@ export async function rasterizeLatex(
   const fontSizePt  = options.fontSize    ?? 16;
   const fontSizePx  = ptToPx(fontSizePt);
   const displayMode = options.displayMode ?? true;
-  const scale       = options.scale       ?? 3;
+  const scale       = options.scale       ?? 4;
 
   const mergedMacros = { ...macroRegistry.getAll(), ...(options.macros || {}) };
 
@@ -394,4 +394,63 @@ export async function rasterizeLatex(
 
   equationCache.set(cacheKey, result);
   return result;
+}
+
+/**
+ * Serializes equation options into JSON string for embedding in Alt Text and metadata.
+ */
+export function serializeEquationMetadata(latex: string, options?: RenderOptions): string {
+  return JSON.stringify({
+    latex: latex || '',
+    bg: options?.background ?? 0,
+    color: options?.color ?? '#000000',
+    fontSize: options?.fontSize ?? 16,
+    displayMode: options?.displayMode ?? true,
+    v: 1
+  });
+}
+
+/**
+ * Parses equation metadata from Alt Text, JSON string, or standard LaTeX string.
+ */
+export function parseEquationMetadata(text?: string | null): {
+  latex: string;
+  background?: string | number;
+  color?: string;
+  fontSize?: number;
+  displayMode?: boolean;
+} | null {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Try parsing embedded JSON metadata
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed.latex === 'string') {
+        return {
+          latex: parsed.latex,
+          background: parsed.bg ?? parsed.background ?? 0,
+          color: parsed.color ?? '#000000',
+          fontSize: parsed.fontSize ?? parsed.size ?? 16,
+          displayMode: parsed.displayMode ?? true
+        };
+      }
+    } catch { /* fallback to standard parsing */ }
+  }
+
+  // Check for "LaTeX: <formula>" prefix
+  if (trimmed.startsWith('LaTeX:')) {
+    return {
+      latex: trimmed.substring(6).trim(),
+      background: 0
+    };
+  }
+
+  // Standard raw LaTeX
+  return {
+    latex: trimmed,
+    background: 0
+  };
 }

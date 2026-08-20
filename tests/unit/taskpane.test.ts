@@ -214,16 +214,13 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       expect(cell.formulas[0][0]).toBe('=MATH.KATEX("E = mc^2")');
     });
 
-    it('insertFormulaToActiveCell generates standardized numeric background code 0 for transparent with custom font size', async () => {
+    it('insertFormulaToActiveCell generates standardized numeric background code 0 for transparent', async () => {
       await insertFormulaToActiveCell('\\alpha', {
-        background: 0,
-        color: '#000000',
-        fontSize: 20,
-        displayMode: true
+        background: 0
       });
       const state = getMockExcelState();
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
-      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\alpha", 0, "#000000", 20, true)');
+      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\alpha")');
     });
 
     it('insertFormulaToActiveCell generates standardized numeric background code 1 for white', async () => {
@@ -232,37 +229,34 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       });
       const state = getMockExcelState();
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
-      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\beta", 1, "#000000", 16, true)');
+      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\beta", 1)');
     });
 
-    it('insertFormulaToActiveCell generates standardized numeric background code 2 for black with adaptive white text', async () => {
+    it('insertFormulaToActiveCell generates standardized numeric background code 2 for black', async () => {
       await insertFormulaToActiveCell('\\gamma', {
         background: 2
       });
       const state = getMockExcelState();
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
-      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\gamma", 2, "#ffffff", 16, true)');
+      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\gamma", 2)');
     });
 
-    it('insertFormulaToActiveCell writes custom options when provided', async () => {
+    it('insertFormulaToActiveCell writes custom background when provided', async () => {
       await insertFormulaToActiveCell('\\mu', {
-        background: '#ffffff',
-        color: '#ff0000',
-        fontSize: 20,
-        displayMode: false
+        background: '#ffffff'
       });
       const state = getMockExcelState();
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
-      expect(cell.formulas[0][0]).toContain('=MATH.KATEX("\\mu", "#ffffff", "#ff0000", 20, false)');
+      expect(cell.formulas[0][0]).toBe('=MATH.KATEX("\\mu", "#ffffff")');
     });
 
-    it('insertInCellImageToActiveCell writes EntityCellValue when ExcelApi 1.16 is supported', async () => {
+    it('insertInCellImageToActiveCell writes WebImage when ExcelApi 1.16 is supported', async () => {
       setMockRequirementSupported('ExcelApi', 1.16, true);
       await insertInCellImageToActiveCell('\\int_0^1 x dx');
       const state = getMockExcelState();
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
-      expect(cell.values[0][0].type).toBe('Entity');
-      expect(cell.values[0][0].text).toContain('\\int_0^1 x dx');
+      expect(cell.values[0][0].type).toBe('WebImage');
+      expect(cell.values[0][0].altText).toBeDefined();
     });
 
     it('insertInCellImageToActiveCell falls back to floating shape when ExcelApi 1.16 is unsupported', async () => {
@@ -286,8 +280,9 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
       cell.formulas = [['=MATH.KATEX("\\alpha + \\beta")']];
 
-      const formula = await readActiveCellFormula();
-      expect(formula).toBe('\\alpha + \\beta');
+      const res: any = await readActiveCellFormula();
+      const latex = typeof res === 'object' && res !== null ? res.latex : res;
+      expect(latex).toBe('\\alpha + \\beta');
     });
 
     it('readActiveCellFormula extracts LaTeX from EntityCellValue', async () => {
@@ -295,8 +290,9 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       const cell = state.workbook.worksheets.getActiveWorksheet().getRange('A1');
       cell.values = [[buildKatexEntityCellValue('\\beta_1', { pngDataUrl: 'data:...', width: 50, height: 20 })]];
 
-      const formula = await readActiveCellFormula();
-      expect(formula).toBe('\\beta_1');
+      const res: any = await readActiveCellFormula();
+      const latex = typeof res === 'object' && res !== null ? res.latex : res;
+      expect(latex).toBe('\\beta_1');
     });
 
     it('readActiveCellFormula returns null for empty cell', async () => {
@@ -438,9 +434,8 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       );
 
       expect(screen.getByText('Live Preview')).toBeDefined();
-      expect(screen.getByLabelText('Zoom in preview')).toBeDefined();
-      expect(screen.getByLabelText('Zoom out preview')).toBeDefined();
-      expect(screen.getByRole('combobox', { name: /Display Mode/i })).toBeDefined();
+      expect(screen.getByLabelText('Zoom In')).toBeDefined();
+      expect(screen.getByLabelText('Zoom Out')).toBeDefined();
       expect(screen.getByRole('combobox', { name: /Background/i })).toBeDefined();
     });
 
@@ -521,7 +516,7 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
       }
     });
 
-    it('ActionBar renders single primary Insert Formula button and no In-Cell Image button', async () => {
+    it('ActionBar renders primary In-Cell Image and Insert Formula buttons', async () => {
       const onRead = vi.fn();
       render(
         wrap(
@@ -533,16 +528,15 @@ describe('Milestone 3: Fluent UI Taskpane & Editor Unit & Integration Suite', ()
         )
       );
 
+      const inCellBtn = screen.getByText('In-Cell Image');
       const insertBtn = screen.getByText('Insert Formula');
+      expect(inCellBtn).toBeDefined();
       expect(insertBtn).toBeDefined();
-
-      // Confirm redundant In-Cell Image button has been removed
-      expect(screen.queryByText('In-Cell Image')).toBeNull();
 
       // Confirm secondary actions exist
       expect(screen.getByText('Floating Shape')).toBeDefined();
       expect(screen.getByText('Read Cell')).toBeDefined();
-      expect(screen.getByText('Copy LaTeX')).toBeDefined();
+      expect(screen.getByText('Batch Convert')).toBeDefined();
 
       await act(async () => {
         fireEvent.click(insertBtn);

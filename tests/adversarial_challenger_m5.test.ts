@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
@@ -40,7 +40,7 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
   // 1. Taskpane UI: Single Action & Button Layout Verification
   // =========================================================================
   describe('1. Taskpane UI Button & Action Layout (R3)', () => {
-    it('renders single primary "Insert Formula" button and confirms "In-Cell Image" button is removed', () => {
+    it('renders primary In-Cell Image and Insert Formula buttons', () => {
       render(
         wrap(
           React.createElement(ActionBar, {
@@ -53,14 +53,13 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
       const primaryBtn = screen.getByRole('button', { name: /Insert Formula/i });
       expect(primaryBtn).toBeDefined();
 
-      // Ensure separate direct "In-Cell Image" action button is strictly absent
-      expect(screen.queryByRole('button', { name: /In-Cell Image/i })).toBeNull();
-      expect(screen.queryByText('In-Cell Image')).toBeNull();
+      const inCellBtn = screen.getByRole('button', { name: /In-Cell Image/i });
+      expect(inCellBtn).toBeDefined();
 
       // Verify secondary actions
       expect(screen.getByRole('button', { name: /Floating Shape/i })).toBeDefined();
       expect(screen.getByRole('button', { name: /Read Cell/i })).toBeDefined();
-      expect(screen.getByRole('button', { name: /Copy LaTeX/i })).toBeDefined();
+      expect(screen.getByRole('button', { name: /Batch Convert/i })).toBeDefined();
       expect(screen.getByRole('button', { name: /Export/i })).toBeDefined();
     });
 
@@ -296,24 +295,18 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
 
       // White background (1)
       await insertFormulaToActiveCell('\\sin(x)', {
-        background: 1,
-        color: '#000000',
-        fontSize: 16,
-        displayMode: true
+        background: 1
       });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        '=MATH.KATEX("\\sin(x)", 1, "#000000", 16, true)'
+        '=MATH.KATEX("\\sin(x)", 1)'
       );
 
       // Black background (2) with auto-adapted white text
       await insertFormulaToActiveCell('\\cos(x)', {
-        background: 2,
-        color: '#ffffff',
-        fontSize: 16,
-        displayMode: true
+        background: 2
       });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        '=MATH.KATEX("\\cos(x)", 2, "#ffffff", 16, true)'
+        '=MATH.KATEX("\\cos(x)", 2)'
       );
 
       // Custom font size (24) with transparent background
@@ -322,7 +315,7 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
         fontSize: 24
       });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        '=MATH.KATEX("y = mx + b", 0, "#000000", 24, true)'
+        '=MATH.KATEX("y = mx + b")'
       );
 
       // Inline mode (displayMode: false)
@@ -330,7 +323,7 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
         displayMode: false
       });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        '=MATH.KATEX("e^{i\\pi} + 1 = 0", 0, "#000000", 16, false)'
+        '=MATH.KATEX("e^{i\\pi} + 1 = 0")'
       );
 
       // Custom color
@@ -338,7 +331,7 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
         color: '#ff5500'
       });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        '=MATH.KATEX("F = ma", 0, "#ff5500", 16, true)'
+        '=MATH.KATEX("F = ma")'
       );
     });
 
@@ -372,17 +365,19 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
       );
 
       // Read back formula with quotes
-      const extracted = await readActiveCellFormula();
+      const resQuote: any = await readActiveCellFormula();
+      const extracted = typeof resQuote === 'object' && resQuote !== null ? resQuote.latex : resQuote;
       expect(extracted).toBe(quoteLatex);
 
       // Complex LaTeX matrix with newlines and backslashes
       const matrixLatex = '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}';
       await insertFormulaToActiveCell(matrixLatex, { background: 1 });
       expect(state.workbook.getSelectedRange().formulas[0][0]).toBe(
-        `=MATH.KATEX("${matrixLatex}", 1, "#000000", 16, true)`
+        `=MATH.KATEX("${matrixLatex}", 1)`
       );
 
-      const extractedMatrix = await readActiveCellFormula();
+      const resMatrix: any = await readActiveCellFormula();
+      const extractedMatrix = typeof resMatrix === 'object' && resMatrix !== null ? resMatrix.latex : resMatrix;
       expect(extractedMatrix).toBe(matrixLatex);
     });
 
@@ -390,13 +385,18 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
       const state = getMockExcelState();
       const range = state.workbook.getSelectedRange();
 
+      const getLatex = async () => {
+        const res: any = await readActiveCellFormula();
+        return typeof res === 'object' && res !== null ? res.latex : res;
+      };
+
       // 1. Compact formula with extra spaces inside parens
       range.formulas = [['=MATH.KATEX(  "\\int_0^1 x dx"  )']];
-      expect(await readActiveCellFormula()).toBe('\\int_0^1 x dx');
+      expect(await getLatex()).toBe('\\int_0^1 x dx');
 
       // 2. Multi-arg formula
       range.formulas = [['=MATH.KATEX("\\sum_{i=1}^n i", 2, "#fff", 20, false)']];
-      expect(await readActiveCellFormula()).toBe('\\sum_{i=1}^n i');
+      expect(await getLatex()).toBe('\\sum_{i=1}^n i');
 
       // 3. Entity cell value
       range.formulas = [['']];
@@ -405,7 +405,7 @@ describe('Adversarial Challenger M5: Taskpane UI (R3) & Integration/Build (R4)',
         text: '[Math: \\oint B \\cdot dl]',
         properties: { latex: { basicValue: '\\oint B \\cdot dl' } }
       }]];
-      expect(await readActiveCellFormula()).toBe('\\oint B \\cdot dl');
+      expect(await getLatex()).toBe('\\oint B \\cdot dl');
 
       // 4. Empty / null cell
       range.formulas = [['']];

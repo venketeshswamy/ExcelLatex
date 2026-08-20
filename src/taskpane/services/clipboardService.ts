@@ -1,10 +1,11 @@
-import { compileLatex, RenderOptions } from '../../core/katexEngine';
+import { compileLatex, compileLatexToNativeMathML, RenderOptions } from '../../core/katexEngine';
 
 export interface ClipboardService {
   copyLatex(latex: string): Promise<boolean>;
+  copyMathML(latex: string): Promise<boolean>;
   copySvg(svgString: string): Promise<boolean>;
   copyPng(pngDataUrl: string): Promise<boolean>;
-  copyEquation(latex: string, options?: RenderOptions): Promise<{ latex: boolean; svg: boolean; png: boolean }>;
+  copyEquation(latex: string, options?: RenderOptions): Promise<{ latex: boolean; mathml: boolean; svg: boolean; png: boolean }>;
 }
 
 /**
@@ -55,8 +56,25 @@ export async function copyLatex(latex: string): Promise<boolean> {
       return true;
     }
     return fallbackCopyText(latex);
-  } catch (err) {
+  } catch {
     return fallbackCopyText(latex);
+  }
+}
+
+/**
+ * Copies native MathML XML directly to the system clipboard for Microsoft Word equation pasting.
+ */
+export async function copyMathML(latex: string): Promise<boolean> {
+  if (!latex) return false;
+  try {
+    const mathml = compileLatexToNativeMathML(latex);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(mathml);
+      return true;
+    }
+    return fallbackCopyText(mathml);
+  } catch {
+    return false;
   }
 }
 
@@ -84,9 +102,8 @@ export async function copyPng(pngDataUrl: string): Promise<boolean> {
       await navigator.clipboard.write([item]);
       return true;
     }
-    // Fallback copy the data URL text
     return copyLatex(pngDataUrl);
-  } catch (err) {
+  } catch {
     return copyLatex(pngDataUrl);
   }
 }
@@ -97,8 +114,9 @@ export async function copyPng(pngDataUrl: string): Promise<boolean> {
 export async function copyEquation(
   latex: string,
   options: RenderOptions = {}
-): Promise<{ latex: boolean; svg: boolean; png: boolean }> {
+): Promise<{ latex: boolean; mathml: boolean; svg: boolean; png: boolean }> {
   const latexSuccess = await copyLatex(latex);
+  const mathmlSuccess = await copyMathML(latex);
   let svgSuccess = false;
   let pngSuccess = false;
 
@@ -112,6 +130,7 @@ export async function copyEquation(
 
   return {
     latex: latexSuccess,
+    mathml: mathmlSuccess,
     svg: svgSuccess,
     png: pngSuccess
   };
@@ -119,6 +138,7 @@ export async function copyEquation(
 
 export const clipboardService: ClipboardService = {
   copyLatex,
+  copyMathML,
   copySvg,
   copyPng,
   copyEquation

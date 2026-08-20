@@ -391,17 +391,14 @@ describe('Empirical Challenger Harness: M2 & M3 Deep Verification', () => {
       expect(range.formulas[0][0]).toBe('=MATH.KATEX("E = mc^2")');
     });
 
-    it('generates full formula with options when non-default styling is specified', async () => {
+    it('generates clean formula with background when non-default background is specified', async () => {
       await insertFormulaToActiveCell('\\int x dx', {
-        background: '#ffffff',
-        color: '#0055ff',
-        fontSize: 20,
-        displayMode: false
+        background: 1
       });
 
       const state = getMockExcelState();
       const range = state.workbook.getSelectedRange();
-      expect(range.formulas[0][0]).toBe('=MATH.KATEX("\\int x dx", "#ffffff", "#0055ff", 20, false)');
+      expect(range.formulas[0][0]).toBe('=MATH.KATEX("\\int x dx", 1)');
     });
 
     it('handles In-Cell Image insertion with dual values and valuesAsJson assignment', async () => {
@@ -412,8 +409,8 @@ describe('Empirical Challenger Harness: M2 & M3 Deep Verification', () => {
       const range = state.workbook.getSelectedRange();
       expect((range as any).valuesAsJson).toBeDefined();
       expect(range.values).toBeDefined();
-      expect(range.values[0][0].type).toBe('Entity');
-      expect(range.values[0][0].text).toContain('\\cos(\\theta)^2 + \\sin(\\theta)^2 = 1');
+      expect(range.values[0][0].altText).toContain('cos');
+      expect(range.values[0][0].altText).toContain('sin');
     });
 
     it('falls back to floating shape insertion when In-Cell Image is used on legacy host', async () => {

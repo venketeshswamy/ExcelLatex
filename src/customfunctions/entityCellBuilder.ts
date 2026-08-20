@@ -4,7 +4,7 @@
  * and detailed formula metadata properties for in-cell mathematical rendering.
  */
 
-import { RenderResult, RenderOptions } from '../core/imageRasterizer';
+import { RenderResult, RenderOptions, serializeEquationMetadata } from '../core/imageRasterizer';
 
 /**
  * Checks whether the current Excel build supports ExcelApi 1.16 EntityCellValue.
@@ -26,37 +26,30 @@ export function isEntityCellValueSupported(): boolean {
 
 export interface EntityProperty {
   type: string;
-  basicValue?: string | number | boolean;
-  basicType?: string;
-  address?: string;
-  altText?: string;
-  [key: string]: any;
-}
-
-export interface CompactLayout {
-  icon?: string;
-}
-
-export interface CardSection {
-  layout: string;
-  title?: string;
-  properties: string[];
-}
-
-export interface CardLayout {
-  title?: string;
-  sections?: CardSection[];
+  basicValue: string | number | boolean;
 }
 
 export interface EntityCellValueLayouts {
-  compact?: CompactLayout;
-  card?: CardLayout;
+  compact?: { icon?: string };
+  card?: {
+    title?: string;
+    sections?: Array<{
+      layout?: string;
+      title?: string;
+      properties?: string[];
+    }>;
+  };
+}
+
+export interface EntityCellValueProvider {
+  description?: string;
+  logoSourceAddress?: string;
 }
 
 export interface KatexWebImageCellValue {
   type: 'WebImage';
   address: string;
-  altText?: string;
+  altText: string;
 }
 
 export interface KatexEntityCellValue {
@@ -72,14 +65,16 @@ export interface KatexEntityCellValue {
  */
 export function buildKatexWebImageCellValue(
   latex: string,
-  renderResult: Partial<RenderResult> & { pngDataUrl?: string; width?: number; height?: number; svg?: string }
+  renderResult: Partial<RenderResult> & { pngDataUrl?: string; width?: number; height?: number; svg?: string },
+  options?: RenderOptions
 ): KatexWebImageCellValue {
   const cleanLatex = latex || '';
   const pngDataUrl = renderResult.pngDataUrl || '';
+  const metadata = serializeEquationMetadata(cleanLatex, options);
   return {
     type: 'WebImage',
     address: pngDataUrl,
-    altText: `LaTeX: ${cleanLatex}`
+    altText: metadata
   };
 }
 

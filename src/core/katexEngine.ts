@@ -226,6 +226,18 @@ export function compileLatexToMathML(
 }
 
 /**
+ * Compiles LaTeX string to clean, native MathML XML string for clipboard pasting directly into Microsoft Word equations.
+ */
+export function compileLatexToNativeMathML(latex: string): string {
+  const fullHtml = compileLatexToHtml(latex, { output: 'mathml', throwOnError: false });
+  const mathMatch = fullHtml.match(/<math[\s\S]*?<\/math>/i);
+  if (mathMatch) {
+    return mathMatch[0];
+  }
+  return `<math xmlns="http://www.w3.org/1998/Math/MathML"><mtext>${latex}</mtext></math>`;
+}
+
+/**
  * Primary equation compiler returning full RenderResult with HTML, Standalone SVG, and High-DPI PNG.
  */
 export async function compileLatex(
@@ -234,3 +246,4 @@ export async function compileLatex(
 ): Promise<RenderResult> {
   return rasterizeLatex(latex, options);
 }
+

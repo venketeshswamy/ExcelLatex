@@ -244,13 +244,10 @@ describe('Adversarial Challenge 2: Empirical Verification & Boundary Stress Harn
       const range = state.workbook.getSelectedRange();
 
       await insertFormulaToActiveCell('x^2', {
-        background: '#ffff00',
-        color: '#ff0000',
-        fontSize: 24,
-        displayMode: false
+        background: '#ffff00'
       });
 
-      expect(range.formulas?.[0]?.[0]).toBe('=MATH.KATEX("x^2", "#ffff00", "#ff0000", 24, false)');
+      expect(range.formulas?.[0]?.[0]).toBe('=MATH.KATEX("x^2", "#ffff00")');
     });
 
     it('properly escapes double quotes inside formula string literals', () => {
@@ -277,22 +274,27 @@ describe('Adversarial Challenge 2: Empirical Verification & Boundary Stress Harn
       await insertInCellImageToActiveCell('\\int x dx');
 
       expect((range as any).valuesAsJson).toBeDefined();
-      expect((range as any).valuesAsJson[0][0].type).toBe('Entity');
-      expect((range as any).valuesAsJson[0][0].text).toBe('[Math: \\int x dx]');
-      expect(range.values[0][0].type).toBe('Entity');
+      expect((range as any).valuesAsJson[0][0].type).toBe('WebImage');
+      expect(range.values[0][0].type).toBe('WebImage');
     });
 
     it('readActiveCellFormula extracts LaTeX from formulas, entities, and shape placeholders', async () => {
       const state = getMockExcelState();
       const range = state.workbook.getSelectedRange();
 
+      // Helper to extract latex from ReadCellResult | string
+      const getLatex = async () => {
+        const res: any = await readActiveCellFormula();
+        return typeof res === 'object' && res !== null ? res.latex : res;
+      };
+
       // 1. From compact formula
       range.formulas = [['=MATH.KATEX("a^2 + b^2 = c^2")']];
-      expect(await readActiveCellFormula()).toBe('a^2 + b^2 = c^2');
+      expect(await getLatex()).toBe('a^2 + b^2 = c^2');
 
       // 2. From parameterized formula
-      range.formulas = [['=MATH.KATEX("\\sqrt{x}", "#fff", "#000", 20, true)']];
-      expect(await readActiveCellFormula()).toBe('\\sqrt{x}');
+      range.formulas = [['=MATH.KATEX("\\sqrt{x}", 1)']];
+      expect(await getLatex()).toBe('\\sqrt{x}');
 
       // 3. From entity cell value
       range.formulas = [['']];
@@ -301,12 +303,12 @@ describe('Adversarial Challenge 2: Empirical Verification & Boundary Stress Harn
         text: '[Math: \\sum n]',
         properties: { latex: { basicValue: '\\sum n' } }
       }]];
-      expect(await readActiveCellFormula()).toBe('\\sum n');
+      expect(await getLatex()).toBe('\\sum n');
 
       // 4. From 📐 marker
       range.formulas = [['']];
       range.values = [['📐 \\gamma_k']];
-      expect(await readActiveCellFormula()).toBe('\\gamma_k');
+      expect(await getLatex()).toBe('\\gamma_k');
     });
   });
 
@@ -315,7 +317,7 @@ describe('Adversarial Challenge 2: Empirical Verification & Boundary Stress Harn
   // =========================================================================
   describe('5. Holistic 10-Flow Compatibility Verification', () => {
     // Flow 1: Taskpane edit -> live preview -> Insert to Cell -> in-cell / fallback shape
-    it('Flow 1: Taskpane insert flow produces valid entity or fallback shape', async () => {
+    it('Flow 1: Taskpane insert flow produces valid in-cell image or fallback shape', async () => {
       const latex = '\\int_a^b f(x) dx';
       const state = getMockExcelState();
 
@@ -323,7 +325,7 @@ describe('Adversarial Challenge 2: Empirical Verification & Boundary Stress Harn
       setMockRequirementSupported('ExcelApi', 1.16, true);
       await insertInCellImageToActiveCell(latex);
       const range = state.workbook.getSelectedRange();
-      expect((range as any).valuesAsJson[0][0].type).toBe('Entity');
+      expect((range as any).valuesAsJson[0][0].type).toBe('WebImage');
 
       // Legacy fallback path
       setMockRequirementSupported('ExcelApi', 1.16, false);

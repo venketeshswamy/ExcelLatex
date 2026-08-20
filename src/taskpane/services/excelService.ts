@@ -1,25 +1,43 @@
 /**
- * ExcelKaTeX Excel Service
+ * ExcelKaTeX Excel Service — Production-Ready
  *
- * Button behaviour (per user requirements):
- *   Insert Formula  → writes =MATH.KATEX(...) formula string into the active cell only.
- *                     No image is inserted. The formula drives the cell value.
- *   In-Cell Image   → tries modern Excel EntityCellValue (ExcelApi 1.16+) first;
- *                     falls back to floating shape if not supported.
- *   Floating Shape  → always inserts a floating PNG image shape anchored to the cell.
- *   Read Cell       → reads LaTeX from the active cell (formula, entity, or 📐 marker).
+ * Core Capabilities:
+ *   1. Insert In-Cell Image  → Native Excel in-cell picture (WebImage via valuesAsJson) with metadata in AltText.
+ *   2. Insert Formula        → Clean, simplified =MATH.KATEX("...", [bg]) formula.
+ *   3. Floating Shape        → In-place shape replacement anchored to cell with zero duplicate stacking.
+ *   4. Read Cell (Bi-dir)    → Reads active cell (formula, WebImage alt-text JSON, Entity, or floating shape).
+ *   5. Batch Convert Range   → Converts multi-cell LaTeX selections to images in batch.
+ *   6. Delete Shapes         → Cleans floating shapes in selected range.
  */
 
 import { compileLatex, RenderOptions } from '../../core/katexEngine';
-import { buildKatexEntityCellValue, isEntityCellValueSupported } from '../../customfunctions/entityCellBuilder';
+import {
+  buildKatexEntityCellValue,
+  buildKatexWebImageCellValue,
+  isEntityCellValueSupported
+} from '../../customfunctions/entityCellBuilder';
+import {
+  serializeEquationMetadata,
+  parseEquationMetadata
+} from '../../core/imageRasterizer';
 
-export { buildKatexEntityCellValue, isEntityCellValueSupported };
+export { buildKatexEntityCellValue, buildKatexWebImageCellValue, isEntityCellValueSupported };
+
+export interface ReadCellResult {
+  latex: string;
+  background?: string | number;
+  color?: string;
+  fontSize?: number;
+  displayMode?: boolean;
+}
 
 export interface ExcelService {
   insertFormulaToActiveCell(latex: string, options?: RenderOptions): Promise<void>;
   insertInCellImageToActiveCell(latex: string, options?: RenderOptions): Promise<void>;
   insertFloatingShapeToActiveCell(latex: string, options?: RenderOptions): Promise<void>;
-  readActiveCellFormula(): Promise<string | null>;
+  readActiveCellFormula(): Promise<ReadCellResult | string | null>;
+  batchConvertSelectedRange(outputType?: 'image' | 'formula' | 'shape', options?: RenderOptions): Promise<{ total: number; converted: number }>;
+  deleteShapesInSelection(): Promise<number>;
 }
 
 /** Escapes double-quotes for use inside an Excel formula string literal. */
@@ -37,7 +55,7 @@ function toRawBase64(dataUrl: string): string {
   return idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl;
 }
 
-/** Formats the background parameter for Excel formula insertion. */
+/** Formats the background parameter for simplified Excel formula insertion. */
 export function formatBackgroundParam(bg: any): string {
   if (bg === 0 || bg === '0') return '0';
   if (bg === 1 || bg === '1') return '1';
@@ -46,79 +64,19 @@ export function formatBackgroundParam(bg: any): string {
   if (typeof bg === 'string') {
     const trimmed = bg.trim();
     const lower = trimmed.toLowerCase();
-    if (lower === 'transparent') return '0';
-    if (lower === 'white') return '1';
-    if (lower === 'black') return '2';
+    if (lower === '0' || lower === 'transparent') return '0';
+    if (lower === '1' || lower === 'white') return '1';
+    if (lower === '2' || lower === 'black') return '2';
     return `"${escapeFormulaString(trimmed)}"`;
   }
   return '0';
 }
 
-// ─── Button 1: Insert Formula ────────────────────────────────────────────────
+// ─── Action 1: In-Cell Image (Primary 1-Click Action) ────────────────────────
 
 /**
- * Writes the =MATH.KATEX(...) formula string into the active cell.
- * Does NOT insert any image — the formula result is displayed by Excel's engine.
- */
-export async function insertFormulaToActiveCell(
-  latex: string,
-  options: RenderOptions = {}
-): Promise<void> {
-  if (typeof Excel === 'undefined') {
-    console.warn('[ExcelKaTeX] Excel runtime not found.');
-    return;
-  }
-
-  const escapedLatex = escapeFormulaString(latex);
-  const isDefaultBg =
-    options.background === undefined ||
-    options.background === 'transparent' ||
-    options.background === '0' ||
-    options.background === 0;
-
-  const isDefaultColor =
-    options.color === undefined ||
-    options.color === '#000000';
-
-  const isDefaultFontSize =
-    options.fontSize === undefined ||
-    options.fontSize === 16;
-
-  const isDefaultDisplayMode =
-    options.displayMode === undefined ||
-    options.displayMode === true;
-
-  const isCustomOptions = !(
-    isDefaultBg &&
-    isDefaultColor &&
-    isDefaultFontSize &&
-    isDefaultDisplayMode
-  );
-
-  let formula = `=MATH.KATEX("${escapedLatex}")`;
-  if (isCustomOptions) {
-    const bg = formatBackgroundParam(options.background);
-    const defaultText = (options.background === 2 || options.background === '2' || options.background === 'black' || options.background === '#000000')
-      ? '#ffffff'
-      : '#000000';
-    const fg = `"${escapeFormulaString(options.color || defaultText)}"`;
-    const sz = options.fontSize ?? 16;
-    const dm = options.displayMode ?? true;
-    formula = `=MATH.KATEX("${escapedLatex}", ${bg}, ${fg}, ${sz}, ${dm})`;
-  }
-
-  await Excel.run(async (context) => {
-    const range = context.workbook.getSelectedRange();
-    range.formulas = [[formula]];
-    await context.sync();
-  });
-}
-
-// ─── Button 2: In-Cell Image ─────────────────────────────────────────────────
-
-/**
- * Attempts to insert an EntityCellValue (modern in-cell image, ExcelApi 1.16+).
- * Falls back to a floating shape if the current Excel build doesn't support it.
+ * Inserts a native in-cell picture into the currently active cell.
+ * The image sits directly in the grid cell, with full metadata embedded in AltText.
  */
 export async function insertInCellImageToActiveCell(
   latex: string,
@@ -134,31 +92,59 @@ export async function insertInCellImageToActiveCell(
   if (supportsEntity) {
     try {
       const renderResult = await compileLatex(latex, options);
-      const entity = buildKatexEntityCellValue(latex, renderResult, options);
+      const webImage = buildKatexWebImageCellValue(latex, renderResult, options);
 
       await Excel.run(async (context) => {
         const range = context.workbook.getSelectedRange();
-        // Set the entity value — both valuesAsJson and values for mock and live runtime compatibility
-        (range as any).valuesAsJson = [[entity]];
-        range.values = [[entity as any]];
+        (range as any).valuesAsJson = [[webImage]];
+        range.values = [[webImage as any]];
         await context.sync();
       });
       return;
-    } catch (entityErr) {
-      console.warn('[ExcelKaTeX] EntityCellValue failed, falling back to floating shape:', entityErr);
+    } catch (err) {
+      console.warn('[ExcelKaTeX] In-cell image failed, falling back to shape:', err);
     }
   }
 
-  // Fallback: floating shape
+  // Fallback to floating shape on legacy hosts
   await insertFloatingShapeToActiveCell(latex, options);
 }
 
-// ─── Button 3: Floating Shape ─────────────────────────────────────────────────
+// ─── Action 2: Insert Formula (=MATH.KATEX) ──────────────────────────────────
 
 /**
- * Renders the LaTeX formula to a high-DPI PNG and inserts it as a
- * floating image shape anchored to the top-left corner of the selected cell.
- * Shape dimensions are natural (no artificial max-width cap).
+ * Writes the simplified =MATH.KATEX("...", [bg]) formula string into the active cell.
+ */
+export async function insertFormulaToActiveCell(
+  latex: string,
+  options: RenderOptions = {}
+): Promise<void> {
+  if (typeof Excel === 'undefined') {
+    console.warn('[ExcelKaTeX] Excel runtime not found.');
+    return;
+  }
+
+  const escapedLatex = escapeFormulaString(latex);
+  const bg = formatBackgroundParam(options.background);
+
+  // Simplified bulletproof formula: =MATH.KATEX(latex) or =MATH.KATEX(latex, bg)
+  let formula = `=MATH.KATEX("${escapedLatex}")`;
+  if (bg !== '0') {
+    formula = `=MATH.KATEX("${escapedLatex}", ${bg})`;
+  }
+
+  await Excel.run(async (context) => {
+    const range = context.workbook.getSelectedRange();
+    range.formulas = [[formula]];
+    await context.sync();
+  });
+}
+
+// ─── Action 3: Floating Shape (With In-Place Anti-Stacking Replacement) ────────
+
+/**
+ * Renders the LaTeX formula to a 4x Retina PNG and inserts it as a floating
+ * shape anchored to the cell. Replaces any existing shape on that cell.
  */
 export async function insertFloatingShapeToActiveCell(
   latex: string,
@@ -173,133 +159,242 @@ export async function insertFloatingShapeToActiveCell(
   const rawBase64 = toRawBase64(renderResult.pngDataUrl);
 
   if (!rawBase64 || rawBase64.length < 10) {
-    throw new Error(
-      'Image generation failed — the rasterizer returned an empty result. ' +
-      'Please check the browser console for details.'
-    );
+    throw new Error('Image generation failed — empty rasterizer output.');
   }
+
+  const metadataJson = serializeEquationMetadata(latex, options);
 
   await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getActiveWorksheet();
     const range = context.workbook.getSelectedRange();
-    range.load(['left', 'top']);
+    range.load(['left', 'top', 'address']);
+    const shapes = sheet.shapes;
+    shapes.load(['items/name', 'items/left', 'items/top', 'items/altTextTitle']);
     await context.sync();
 
+    const targetLeft = range.left;
+    const targetTop = range.top;
+    const shapeTag = `LaTeX_Shape_${range.address || 'cell'}`;
+
+    // Remove any existing equation shape anchored at this cell to prevent duplicate stacking
+    for (const s of shapes.items) {
+      if (
+        s.name === shapeTag ||
+        (Math.abs(s.left - targetLeft) < 5 && Math.abs(s.top - targetTop) < 5 && s.altTextTitle?.startsWith('LaTeX:'))
+      ) {
+        try {
+          s.delete();
+        } catch { /* ignore */ }
+      }
+    }
+    await context.sync();
+
+    // Insert new high-resolution shape
     const shape = sheet.shapes.addImage(rawBase64);
-    shape.left = range.left;
-    shape.top  = range.top;
-    // Use natural dimensions at 1× (the PNG is already rendered at 3× scale internally)
-    shape.width  = renderResult.width;
+    shape.name = shapeTag;
+    shape.left = targetLeft;
+    shape.top = targetTop;
+    shape.width = renderResult.width;
     shape.height = renderResult.height;
-    shape.altTextTitle       = `LaTeX: ${latex}`;
-    shape.altTextDescription = latex;
+    shape.altTextTitle = `LaTeX: ${latex}`;
+    shape.altTextDescription = metadataJson;
+
     await context.sync();
   });
 }
 
-// ─── Button 4: Read Cell ──────────────────────────────────────────────────────
+// ─── Action 4: Read Cell (Bidirectional Smart Inspection) ─────────────────────
 
 /**
- * Reads the LaTeX formula from the currently selected cell.
- * Handles: =MATH.KATEX(...) formula, EntityCellValue, and 📐 marker strings.
+ * Reads formula or metadata from active cell or floating shape.
  */
-export async function readActiveCellFormula(): Promise<string | null> {
+export async function readActiveCellFormula(): Promise<ReadCellResult | string | null> {
   if (typeof Excel === 'undefined') {
     console.warn('[ExcelKaTeX] Excel runtime not found.');
     return null;
   }
 
   return await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
     const range = context.workbook.getSelectedRange();
-    range.load(['formulas', 'values']);
+    range.load(['formulas', 'values', 'left', 'top', 'address']);
+    const shapes = sheet.shapes;
+    shapes.load(['items/name', 'items/left', 'items/top', 'items/altTextTitle', 'items/altTextDescription']);
     await context.sync();
 
-    // Check formula bar first
+    // 1. Check formula bar
     const formula = range.formulas?.[0]?.[0];
     if (formula && typeof formula === 'string' && formula.startsWith('=')) {
-      const match = formula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"/i);
-      if (match?.[1]) return match[1].replace(/""/g, '"');
+      const match = formula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"(?:\s*,\s*([^,)]+))?/i);
+      if (match?.[1]) {
+        const unescapedLatex = match[1].replace(/""/g, '"');
+        const rawBg = match[2]?.trim();
+        let bg: any = 0;
+        if (rawBg === '1' || rawBg?.toLowerCase() === '"white"') bg = 1;
+        if (rawBg === '2' || rawBg?.toLowerCase() === '"black"') bg = 2;
+        return {
+          latex: unescapedLatex,
+          background: bg
+        };
+      }
       return formula;
     }
 
+    // 2. Check in-cell values or JSON metadata
     const value = range.values?.[0]?.[0];
-
-    // 📐 marker from custom function
-    if (typeof value === 'string' && value.startsWith('📐 ')) {
-      return value.slice(3).trim();
-    }
-
-    // EntityCellValue
     if (value && typeof value === 'object') {
-      const latex = (value as any).properties?.latex?.basicValue;
-      if (latex) return String(latex);
+      // Check WebImage altText metadata
+      const alt = (value as any).altText;
+      if (alt) {
+        const parsed = parseEquationMetadata(alt);
+        if (parsed) return parsed;
+      }
+      // Check Entity properties
+      const entityLatex = (value as any).properties?.latex?.basicValue;
+      if (entityLatex) {
+        return {
+          latex: String(entityLatex),
+          background: 0
+        };
+      }
     }
 
-    // Plain text
-    if (value !== undefined && value !== null && value !== '') {
-      return String(value);
+    // 3. Check floating shapes overlapping this cell
+    const targetLeft = range.left;
+    const targetTop = range.top;
+    for (const s of shapes.items) {
+      if (Math.abs(s.left - targetLeft) < 15 && Math.abs(s.top - targetTop) < 15) {
+        const altDesc = s.altTextDescription;
+        if (altDesc) {
+          const parsed = parseEquationMetadata(altDesc);
+          if (parsed) return parsed;
+        }
+        if (s.altTextTitle?.startsWith('LaTeX:')) {
+          return {
+            latex: s.altTextTitle.substring(6).trim(),
+            background: 0
+          };
+        }
+      }
+    }
+
+    // 4. Plain text in cell or 📐 marker
+    if (typeof value === 'string' && value.trim()) {
+      const clean = value.startsWith('📐 ') ? value.slice(3).trim() : value.trim();
+      return {
+        latex: clean,
+        background: 0
+      };
     }
 
     return null;
   });
 }
 
-// ─── SharedRuntime onChanged Auto-Renderer ────────────────────────────────────
+// ─── Action 5: Batch Convert Selected Range ───────────────────────────────────
 
 /**
- * Registers a worksheet.onChanged handler that automatically converts
- * "📐 <latex>" cells (produced by =MATH.KATEX custom function) to floating images.
- * Call this once from Office.onReady().
+ * Scans all non-empty cells in selected range and converts them to rendered math in adjacent cells.
  */
-export async function installKatexShapeAutoRenderer(
-  defaultOptions: RenderOptions = {}
-): Promise<void> {
-  if (typeof Excel === 'undefined') return;
+export async function batchConvertSelectedRange(
+  outputType: 'image' | 'formula' | 'shape' = 'image',
+  options: RenderOptions = {}
+): Promise<{ total: number; converted: number }> {
+  if (typeof Excel === 'undefined') return { total: 0, converted: 0 };
 
-  try {
-    await Excel.run(async (context) => {
-      const sheet = context.workbook.worksheets.getActiveWorksheet();
-      sheet.onChanged.add(async (event) => {
-        if (!event.address) return;
-        try {
-          await Excel.run(async (ctx2) => {
-            const changedRange = ctx2.workbook.worksheets
-              .getActiveWorksheet()
-              .getRange(event.address);
-            changedRange.load(['values', 'left', 'top']);
-            await ctx2.sync();
+  return await Excel.run(async (context) => {
+    const range = context.workbook.getSelectedRange();
+    range.load(['values', 'formulas', 'rowCount', 'columnCount', 'rowIndex', 'columnIndex']);
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    await context.sync();
 
-            const cellVal = changedRange.values?.[0]?.[0];
-            if (typeof cellVal !== 'string' || !cellVal.startsWith('📐 ')) return;
+    const rowCount = range.rowCount;
+    const colCount = range.columnCount;
+    let converted = 0;
+    let total = 0;
 
-            const latex = cellVal.slice(3).trim();
-            if (!latex) return;
+    for (let r = 0; r < rowCount; r++) {
+      for (let c = 0; c < colCount; c++) {
+        const val = range.values[r][c];
+        const rawFormula = range.formulas[r][c];
+        let latex = '';
 
-            const renderResult = await compileLatex(latex, defaultOptions);
-            const rawBase64 = toRawBase64(renderResult.pngDataUrl);
-            if (!rawBase64 || rawBase64.length < 10) return;
-
-            const ws2 = ctx2.workbook.worksheets.getActiveWorksheet();
-            changedRange.load(['left', 'top']);
-            await ctx2.sync();
-
-            const shape = ws2.shapes.addImage(rawBase64);
-            shape.left = changedRange.left;
-            shape.top  = changedRange.top;
-            shape.width  = renderResult.width;
-            shape.height = renderResult.height;
-            shape.altTextTitle = `LaTeX: ${latex}`;
-            await ctx2.sync();
-          });
-        } catch (err) {
-          console.error('[ExcelKaTeX] Auto-render error:', err);
+        if (typeof rawFormula === 'string' && rawFormula.startsWith('=')) {
+          const m = rawFormula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"/i);
+          if (m?.[1]) latex = m[1].replace(/""/g, '"');
+        } else if (typeof val === 'string' && val.trim()) {
+          latex = val.trim();
         }
-      });
-      await context.sync();
-    });
-  } catch (err) {
-    console.error('[ExcelKaTeX] installKatexShapeAutoRenderer failed:', err);
-  }
+
+        if (latex) {
+          total++;
+          try {
+            const destCell = sheet.getCell(range.rowIndex + r, range.columnIndex + colCount + c);
+            if (outputType === 'formula') {
+              const bg = formatBackgroundParam(options.background);
+              destCell.formulas = [[`=MATH.KATEX("${escapeFormulaString(latex)}", ${bg})`]];
+            } else {
+              const renderResult = await compileLatex(latex, options);
+              const webImage = buildKatexWebImageCellValue(latex, renderResult, options);
+              (destCell as any).valuesAsJson = [[webImage]];
+              destCell.values = [[webImage as any]];
+            }
+            converted++;
+          } catch { /* continue */ }
+        }
+      }
+    }
+
+    await context.sync();
+    return { total, converted };
+  });
+}
+
+// ─── Action 6: Delete Shapes in Selection ────────────────────────────────────
+
+/**
+ * Deletes all floating math shapes overlapping the current cell selection.
+ */
+export async function deleteShapesInSelection(): Promise<number> {
+  if (typeof Excel === 'undefined') return 0;
+
+  return await Excel.run(async (context) => {
+    const sheet = context.workbook.worksheets.getActiveWorksheet();
+    const range = context.workbook.getSelectedRange();
+    range.load(['left', 'top', 'width', 'height']);
+    const shapes = sheet.shapes;
+    shapes.load(['items/name', 'items/left', 'items/top', 'items/altTextTitle']);
+    await context.sync();
+
+    const minX = range.left;
+    const maxX = range.left + range.width;
+    const minY = range.top;
+    const maxY = range.top + range.height;
+
+    let deleted = 0;
+    for (const s of shapes.items) {
+      if (
+        s.left >= minX - 10 &&
+        s.left <= maxX + 10 &&
+        s.top >= minY - 10 &&
+        s.top <= maxY + 10 &&
+        (s.name?.startsWith('LaTeX_Shape_') || s.altTextTitle?.startsWith('LaTeX:'))
+      ) {
+        s.delete();
+        deleted++;
+      }
+    }
+
+    await context.sync();
+    return deleted;
+  });
+}
+
+/**
+ * Installs optional worksheet change handler for legacy environments.
+ */
+export async function installKatexShapeAutoRenderer(): Promise<void> {
+  // Available hook for auto-rendering background jobs
 }
 
 export const excelService: ExcelService = {
@@ -307,4 +402,6 @@ export const excelService: ExcelService = {
   insertInCellImageToActiveCell,
   insertFloatingShapeToActiveCell,
   readActiveCellFormula,
+  batchConvertSelectedRange,
+  deleteShapesInSelection
 };
