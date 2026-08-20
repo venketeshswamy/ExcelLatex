@@ -146,14 +146,32 @@ async function renderKatexToCanvas(
     let y = isOverline ? (rect.top - oy) : (rect.top - oy + rect.height);
     let w = rect.width;
 
-    // Strictly clamp fraction lines to the width and position of their parent .mfrac
+    // Strictly clamp fraction lines to the exact bounding box of their numerator & denominator contents
     if (el.classList.contains('frac-line')) {
       const mfrac = el.closest('.mfrac');
       if (mfrac) {
-        const mfracRect = mfrac.getBoundingClientRect();
-        if (mfracRect.width > 0) {
-          x = mfracRect.left - ox;
-          w = mfracRect.width;
+        const items = mfrac.querySelectorAll('.mord, .mop, .mbin, .mrel, .mopen, .mclose, .mpunct, .minner, svg, .sqrt, .katex-logo');
+        let minLeft = Infinity;
+        let maxRight = -Infinity;
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          if (item !== el && !item.classList.contains('frac-line')) {
+            const r = item.getBoundingClientRect();
+            if (r.width > 0 && r.height > 0) {
+              if (r.left < minLeft) minLeft = r.left;
+              if (r.right > maxRight) maxRight = r.right;
+            }
+          }
+        }
+        if (maxRight > minLeft && isFinite(minLeft)) {
+          x = (minLeft - ox) - 1;
+          w = (maxRight - minLeft) + 2;
+        } else {
+          const mfracRect = mfrac.getBoundingClientRect();
+          if (mfracRect.width > 0) {
+            x = mfracRect.left - ox;
+            w = mfracRect.width;
+          }
         }
       }
     }
