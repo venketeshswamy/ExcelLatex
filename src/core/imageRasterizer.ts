@@ -48,11 +48,93 @@ function ptToPx(pt: number): number {
 }
 
 /**
+ * Native Browser Engine Render: Uses SVG ForeignObject to capture the exact,
+ * pixel-perfect KaTeX layout and CSS typography directly onto an HTML5 canvas.
+ */
+async function renderViaForeignObject(
+  katexHtml: string,
+  width: number,
+  height: number,
+  scale: number,
+  fontSizePx: number,
+  color: string,
+  bg: string,
+  isTransparent: boolean
+): Promise<string | null> {
+  if (typeof Image === 'undefined') return null;
+
+  return new Promise<string | null>((resolve) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(width * scale);
+      canvas.height = Math.ceil(height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(null);
+
+      ctx.scale(scale, scale);
+      if (!isTransparent) {
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      // Collect active KaTeX styles from document
+      let katexCss = '';
+      try {
+        for (let i = 0; i < document.styleSheets.length; i++) {
+          const sheet = document.styleSheets[i];
+          try {
+            const rules = sheet.cssRules;
+            if (rules) {
+              for (let j = 0; j < rules.length; j++) {
+                const text = rules[j].cssText;
+                if (text && (text.includes('katex') || text.includes('KaTeX'))) {
+                  katexCss += text + '\n';
+                }
+              }
+            }
+          } catch { /* cross-origin sheet */ }
+        }
+      } catch { /* ignore */ }
+
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <style>
+          ${katexCss}
+          .katex { font-size: ${fontSizePx}px !important; color: ${color} !important; }
+        </style>
+        <foreignObject width="100%" height="100%">
+          <div xmlns="http://www.w3.org/1999/xhtml" style="font-size:${fontSizePx}px;color:${color};background:${isTransparent ? 'transparent' : bg};padding:2px;box-sizing:border-box;">
+            ${katexHtml}
+          </div>
+        </foreignObject>
+      </svg>`;
+
+      const img = new Image();
+      const timeout = setTimeout(() => resolve(null), 1200);
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        try {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/png'));
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => {
+        clearTimeout(timeout);
+        resolve(null);
+      };
+
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
  * Core renderer: places KaTeX HTML in the live page DOM (where KaTeX CSS and
- * fonts are fully active), then walks the DOM tree to redraw every element
- * onto an HTML5 canvas using the Canvas 2D API.
- *
- * This is the only approach that reliably works in Edge WebView2 inside Excel.
+ * fonts are fully active), then renders via ForeignObject or precise DOM-walk.
  */
 async function renderKatexToCanvas(
   katexHtml: string,
@@ -113,7 +195,25 @@ async function renderKatexToCanvas(
   const width  = Math.max(80, Math.ceil(measuredWidth)  + 4);
   const height = Math.max(36, Math.ceil(measuredHeight) + 4);
 
-  // ── Step 4: Set up canvas ─────────────────────────────────────────────────
+  // ── Step 4: Primary Native Browser Render (SVG ForeignObject) ─────────────
+  try {
+    const foDataUrl = await renderViaForeignObject(
+      katexHtml,
+      width,
+      height,
+      scale,
+      fontSizePx,
+      color,
+      bg,
+      isTransparent
+    );
+    if (foDataUrl && foDataUrl.length > 50) {
+      document.body.removeChild(probe);
+      return { dataUrl: foDataUrl, width, height };
+    }
+  } catch { /* proceed to DOM-walk fallback */ }
+
+  // ── Step 5: High-Precision DOM-Walk Fallback ───────────────────────────────
   const canvas = document.createElement('canvas');
   canvas.width  = Math.ceil(width  * scale);
   canvas.height = Math.ceil(height * scale);
@@ -134,7 +234,7 @@ async function renderKatexToCanvas(
   const ox = containerRect.left;
   const oy = containerRect.top;
 
-  // ── Step 5: Draw math lines (CSS border-bottom / border-top, no text node) ─
+  // Draw math lines (CSS border-bottom / border-top, strictly bounded to contents)
   const mathLines = probe.querySelectorAll('.frac-line, .overline-line, .underline-line, .hline');
   for (const el of mathLines) {
     const isOverline = el.classList.contains('overline-line');
@@ -166,12 +266,24 @@ async function renderKatexToCanvas(
         if (maxRight > minLeft && isFinite(minLeft)) {
           x = (minLeft - ox) - 1;
           w = (maxRight - minLeft) + 2;
-        } else {
-          const mfracRect = mfrac.getBoundingClientRect();
-          if (mfracRect.width > 0) {
-            x = mfracRect.left - ox;
-            w = mfracRect.width;
+        }
+      }
+    } else if (isOverline) {
+      const sqrt = el.closest('.sqrt');
+      if (sqrt) {
+        const items = sqrt.querySelectorAll('.mord, .mop, .mbin, .mrel, .mopen, .mclose, .mpunct, .minner');
+        let minLeft = Infinity;
+        let maxRight = -Infinity;
+        for (let i = 0; i < items.length; i++) {
+          const r = items[i].getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            if (r.left < minLeft) minLeft = r.left;
+            if (r.right > maxRight) maxRight = r.right;
           }
+        }
+        if (maxRight > minLeft && isFinite(minLeft)) {
+          x = (minLeft - ox);
+          w = (maxRight - minLeft) + 2;
         }
       }
     }

@@ -5,7 +5,7 @@
       "id": "KATEX",
       "name": "KATEX",
       "description": "Renders a LaTeX mathematical equation locally via KaTeX into an in-cell image or floating shape.",
-      "helpUrl": "https://localhost:3000/help.html",
+      "helpUrl": "https://venketeshswamy.github.io/ExcelLatex/help.html",
       "options": {
         "requiresAddress": true,
         "requiresInvocation": true
