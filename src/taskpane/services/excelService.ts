@@ -97,7 +97,6 @@ export async function insertInCellImageToActiveCell(
       await Excel.run(async (context) => {
         const range = context.workbook.getSelectedRange();
         (range as any).valuesAsJson = [[webImage]];
-        range.values = [[webImage as any]];
         await context.sync();
       });
       return;
@@ -217,40 +216,46 @@ export async function readActiveCellFormula(): Promise<ReadCellResult | string |
   return await Excel.run(async (context) => {
     const sheet = context.workbook.worksheets.getActiveWorksheet();
     const range = context.workbook.getSelectedRange();
-    range.load(['formulas', 'values', 'left', 'top', 'address']);
+    range.load(['valuesAsJson', 'formulas', 'values', 'left', 'top', 'address']);
     const shapes = sheet.shapes;
     shapes.load(['items/name', 'items/left', 'items/top', 'items/altTextTitle', 'items/altTextDescription']);
     await context.sync();
 
-    // 1. Check formula bar
+    // 1. Check formula bar (e.g. =MATH.KATEX(...) or in-cell image JSON @{"latex":...})
     const formula = range.formulas?.[0]?.[0];
-    if (formula && typeof formula === 'string' && formula.startsWith('=')) {
-      const match = formula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"(?:\s*,\s*([^,)]+))?/i);
-      if (match?.[1]) {
-        const unescapedLatex = match[1].replace(/""/g, '"');
-        const rawBg = match[2]?.trim();
-        let bg: any = 0;
-        if (rawBg === '1' || rawBg?.toLowerCase() === '"white"') bg = 1;
-        if (rawBg === '2' || rawBg?.toLowerCase() === '"black"') bg = 2;
-        return {
-          latex: unescapedLatex,
-          background: bg
-        };
+    if (formula && typeof formula === 'string') {
+      if (formula.startsWith('=')) {
+        const match = formula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"(?:\s*,\s*([^,)]+))?/i);
+        if (match?.[1]) {
+          const unescapedLatex = match[1].replace(/""/g, '"');
+          const rawBg = match[2]?.trim();
+          let bg: any = 0;
+          if (rawBg === '1' || rawBg?.toLowerCase() === '"white"') bg = 1;
+          if (rawBg === '2' || rawBg?.toLowerCase() === '"black"') bg = 2;
+          return {
+            latex: unescapedLatex,
+            background: bg
+          };
+        }
       }
-      return formula;
+
+      // Check if formula is raw in-cell image JSON (e.g. @{"latex":...} or {"latex":...})
+      const cleanJson = formula.replace(/^@+/, '').trim();
+      if (cleanJson.startsWith('{') && cleanJson.includes('"latex"')) {
+        const parsed = parseEquationMetadata(cleanJson);
+        if (parsed) return parsed;
+      }
     }
 
-    // 2. Check in-cell values or JSON metadata
-    const value = range.values?.[0]?.[0];
-    if (value && typeof value === 'object') {
-      // Check WebImage altText metadata
-      const alt = (value as any).altText;
+    // 2. Check in-cell rich values via valuesAsJson
+    const richValue = (range as any).valuesAsJson?.[0]?.[0];
+    if (richValue && typeof richValue === 'object') {
+      const alt = richValue.altText;
       if (alt) {
         const parsed = parseEquationMetadata(alt);
         if (parsed) return parsed;
       }
-      // Check Entity properties
-      const entityLatex = (value as any).properties?.latex?.basicValue;
+      const entityLatex = richValue.properties?.latex?.basicValue;
       if (entityLatex) {
         return {
           latex: String(entityLatex),
@@ -259,7 +264,17 @@ export async function readActiveCellFormula(): Promise<ReadCellResult | string |
       }
     }
 
-    // 3. Check floating shapes overlapping this cell
+    // 3. Check legacy range.values object if present
+    const value = range.values?.[0]?.[0];
+    if (value && typeof value === 'object') {
+      const alt = (value as any).altText;
+      if (alt) {
+        const parsed = parseEquationMetadata(alt);
+        if (parsed) return parsed;
+      }
+    }
+
+    // 4. Check floating shapes overlapping this cell
     const targetLeft = range.left;
     const targetTop = range.top;
     for (const s of shapes.items) {
@@ -278,9 +293,13 @@ export async function readActiveCellFormula(): Promise<ReadCellResult | string |
       }
     }
 
-    // 4. Plain text in cell or 📐 marker
-    if (typeof value === 'string' && value.trim()) {
+    // 5. Plain text in cell (ignoring "#VALUE!" error placeholder)
+    if (typeof value === 'string' && value.trim() && value.trim() !== '#VALUE!') {
       const clean = value.startsWith('📐 ') ? value.slice(3).trim() : value.trim();
+      if (clean.startsWith('{') && clean.includes('"latex"')) {
+        const parsed = parseEquationMetadata(clean);
+        if (parsed) return parsed;
+      }
       return {
         latex: clean,
         background: 0
@@ -322,7 +341,7 @@ export async function batchConvertSelectedRange(
         if (typeof rawFormula === 'string' && rawFormula.startsWith('=')) {
           const m = rawFormula.match(/^=MATH\.KATEX\s*\(\s*"((?:[^"]|"")*)"/i);
           if (m?.[1]) latex = m[1].replace(/""/g, '"');
-        } else if (typeof val === 'string' && val.trim()) {
+        } else if (typeof val === 'string' && val.trim() && val.trim() !== '#VALUE!') {
           latex = val.trim();
         }
 
@@ -337,7 +356,6 @@ export async function batchConvertSelectedRange(
               const renderResult = await compileLatex(latex, options);
               const webImage = buildKatexWebImageCellValue(latex, renderResult, options);
               (destCell as any).valuesAsJson = [[webImage]];
-              destCell.values = [[webImage as any]];
             }
             converted++;
           } catch { /* continue */ }

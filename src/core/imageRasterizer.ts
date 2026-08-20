@@ -340,7 +340,7 @@ export async function rasterizeLatex(
   const fontSizePt  = options.fontSize    ?? 16;
   const fontSizePx  = ptToPx(fontSizePt);
   const displayMode = options.displayMode ?? true;
-  const scale       = options.scale       ?? 4;
+  const scale       = options.scale       ?? 2;
 
   const mergedMacros = { ...macroRegistry.getAll(), ...(options.macros || {}) };
 
