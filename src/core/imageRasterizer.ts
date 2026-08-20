@@ -482,11 +482,15 @@ export async function rasterizeLatex(
 
   const mergedMacros = { ...macroRegistry.getAll(), ...(options.macros || {}) };
 
-  // 1. KaTeX → HTML (used for both preview and DOM rendering)
+  // 1. KaTeX → HTML (tightly bounded math layout)
   let html = '';
   try {
-    html = katex.renderToString(latex, {
-      displayMode,
+    const mathCode = displayMode && !latex.trim().startsWith('\\displaystyle')
+      ? `\\displaystyle ${latex}`
+      : latex;
+
+    html = katex.renderToString(mathCode, {
+      displayMode: false,
       throwOnError: false,
       errorColor: '#d13438',
       macros: mergedMacros,
