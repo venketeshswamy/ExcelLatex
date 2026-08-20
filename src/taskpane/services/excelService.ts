@@ -131,14 +131,9 @@ export async function insertInCellImageToActiveCell(
     shape.altTextTitle = `LaTeX: ${latex}`;
     shape.altTextDescription = metadataJson;
 
-    // 2. Try native M365 placeInCell if supported
+    // 2. Anchor firmly to cell bounds so it moves & sizes with the cell
     try {
-      if (typeof (shape as any).placeInCell === 'function') {
-        (shape as any).placeInCell(range);
-      } else {
-        // Anchor firmly to cell bounds so it moves & sizes with the cell
-        (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
-      }
+      (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
     } catch {
       try {
         (shape as any).placement = 'TwoCellAnchor';
@@ -407,12 +402,12 @@ export async function batchConvertSelectedRange(
               shape.altTextDescription = serializeEquationMetadata(latex, options);
 
               try {
-                if (typeof (shape as any).placeInCell === 'function') {
-                  (shape as any).placeInCell(destCell);
-                } else {
-                  (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
-                }
-              } catch { /* continue */ }
+                (shape as any).placement = (Excel as any).Placement?.twoCellAnchor || 'TwoCellAnchor';
+              } catch {
+                try {
+                  (shape as any).placement = 'TwoCellAnchor';
+                } catch { /* continue */ }
+              }
             }
             converted++;
           } catch { /* continue */ }
